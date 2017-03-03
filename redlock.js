@@ -88,6 +88,9 @@ function Redlock(clients, options) {
 	this.unlockScript = typeof options.unlockScript === 'function' ? options.unlockScript(unlockScript) : unlockScript;
 	this.extendScript = typeof options.extendScript === 'function' ? options.extendScript(extendScript) : extendScript;
 
+	this.extraLockKeys = options.extraLockKeys;
+	this.extraLockArgs = options.extraLockArgs;
+
 	// set the redis servers from additional arguments
 	this.servers = clients;
 	if(this.servers.length === 0)
@@ -262,12 +265,20 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 		// the number of times we have attempted this lock
 		var attempts = 0;
 
-
 		// create a new lock
 		if(value === null) {
 			value = self._random();
+			var keys = [resource].concat(self.extraLockKeys || []);
 			request = function(server, loop){
-				return server.eval(self.lockScript, 1, resource, value, ttl, loop);
+				var args = [value, ttl].concat(self.extraLockArgs || []);
+				if(!server['redlockLock']){
+					server.defineCommand('redlockLock', {
+						numberOfKeys: keys.length,
+						lua: self.lockScript
+					});
+				}
+
+				return server['redlockLock'].apply(server, keys.concat(args).concat([loop]));
 			};
 		}
 
