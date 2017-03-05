@@ -269,16 +269,17 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 		if(value === null) {
 			value = self._random();
 			var keys = [resource].concat(self.extraLockKeys || []);
+			var args = [value, ttl].concat(self.extraLockArgs || []);
+			var cmd = 'redlockLock' + (self.extraLockKeys ? 'Extra' : '');
 			request = function(server, loop){
-				var args = [value, ttl].concat(self.extraLockArgs || []);
-				if(!server['redlockLock']){
-					server.defineCommand('redlockLock', {
+				if(!server[cmd]){
+					server.defineCommand(cmd, {
 						numberOfKeys: keys.length,
 						lua: self.lockScript
 					});
 				}
 
-				return server['redlockLock'].apply(server, keys.concat(args).concat([loop]));
+				return server[cmd].apply(server, keys.concat(args).concat([loop]));
 			};
 		}
 
@@ -315,6 +316,7 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 				var lock = new Lock(self, resource, value, start + ttl - drift);
 
 				// SUCCESS: there is concensus and the lock is not expired
+				console.log("votes %s, quorum %s", votes, quorum)
 				if(votes >= quorum && lock.expiration > Date.now())
 					return resolve(lock);
 
